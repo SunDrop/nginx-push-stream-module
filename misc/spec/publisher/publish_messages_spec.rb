@@ -18,7 +18,7 @@ describe "Publisher Publishing Messages" do
       EventMachine.run do
         sub = EventMachine::HttpRequest.new(nginx_address + '/sub/' + channel.to_s).get :head => headers
         sub.stream do |chunk|
-          chunk.should eql(body + "\r\n")
+          chunk.should eql(body)
           EventMachine.stop
         end
 
@@ -35,7 +35,7 @@ describe "Publisher Publishing Messages" do
       EventMachine.run do
         sub = EventMachine::HttpRequest.new(nginx_address + '/sub/' + channel.to_s).get :head => headers
         sub.stream do |chunk|
-          chunk.should eql(body + "\r\n")
+          chunk.should eql(body)
           EventMachine.stop
         end
 
@@ -48,11 +48,11 @@ describe "Publisher Publishing Messages" do
     channel = 'ch_test_publish_messages_with_different_bytes'
 
     nginx_run_server(config.merge(:client_max_body_size => '130k', :client_body_buffer_size => '130k', :subscriber_connection_ttl => "1s")) do |conf|
-      ranges = [1..255]
+      ranges = [0..255]
       ranges.each do |range|
         bytes = []
         range.each do |i|
-          1.upto(255) do |j|
+          0.upto(255) do |j|
             bytes << "%s%s" % [i.chr, j.chr]
           end
         end
@@ -67,7 +67,7 @@ describe "Publisher Publishing Messages" do
           end
 
           sub.callback do
-            response.bytes.to_a.should eql("#{body}\r\n".bytes.to_a)
+            response.bytes.to_a.should eql("#{body}".bytes.to_a)
             EventMachine.stop
           end
 
@@ -91,7 +91,7 @@ describe "Publisher Publishing Messages" do
         end
         sub.callback do
           (Time.now - start).should be < 2 #should be disconnect right after receive the large message
-          response.should eql(body + "\r\n")
+          response.should eql(body)
 
           response = ''
           start = Time.now
@@ -101,7 +101,7 @@ describe "Publisher Publishing Messages" do
           end
           sub_1.callback do
             (Time.now - start).should be > 2 #should be disconnected only when timeout happens
-            response.should eql(body + "\r\n")
+            response.should eql(body)
             EventMachine.stop
           end
         end
@@ -112,7 +112,7 @@ describe "Publisher Publishing Messages" do
   end
 
   it "should publish many messages in the same channel" do
-    body_prefix = 'published message '
+    body_prefix = 'published_message_'
     channel = 'ch_test_publish_many_messages_in_the_same_channel'
     messagens_to_publish = 1500
 
@@ -122,7 +122,7 @@ describe "Publisher Publishing Messages" do
         sub = EventMachine::HttpRequest.new(nginx_address + '/sub/' + channel.to_s).get :head => headers
         sub.stream do |chunk|
           response += chunk
-          recieved_messages = response.split("\r\n")
+          recieved_messages = response.split(" ")
 
           if recieved_messages.length == messagens_to_publish
             recieved_messages.last.should eql(body_prefix + messagens_to_publish.to_s)
@@ -134,7 +134,7 @@ describe "Publisher Publishing Messages" do
           0.step(messagens_to_publish - 1, 500) do |i|
             socket = open_socket(nginx_host, nginx_port)
             1.upto(500) do |j|
-              resp_headers, body = post_in_socket("/pub?id=#{channel}", body_prefix + (i+j).to_s, socket, {:wait_for => "}\r\n"})
+              resp_headers, body = post_in_socket("/pub?id=#{channel}", "#{body_prefix}#{i+j} ", socket, {:wait_for => "}\r\n"})
               fail("Message was not published: " + body_prefix + (i+j).to_s) unless resp_headers.include?("HTTP/1.1 200 OK")
             end
             socket.close

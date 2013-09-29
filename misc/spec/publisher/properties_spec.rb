@@ -433,8 +433,8 @@ describe "Publisher Properties" do
             resp_2 += chunk
           end
           sub_2.callback do
-            resp_1.should eql("<script>p(1,'channel_id_inside_if_block','published message');</script>\r\n")
-            resp_2.should eql("<script>p(1,'test_channel_id_inside_if_block','published message');</script>\r\n")
+            resp_1.should eql("<script>p(1,'channel_id_inside_if_block','published message');</script>")
+            resp_2.should eql("<script>p(1,'test_channel_id_inside_if_block','published message');</script>")
             EventMachine.stop
           end
 
@@ -574,19 +574,19 @@ describe "Publisher Properties" do
         EventMachine.run do
           sub_1 = EventMachine::HttpRequest.new(nginx_address + '/sub/' + channel.to_s + "_1").get :head => headers
           sub_1.stream do |chunk|
-            chunk.should eql("#{body}|#{channel.to_s + "_1"}\r\n")
+            chunk.should eql("#{body}|#{channel.to_s + "_1"}")
             messages += 1
           end
 
           sub_2 = EventMachine::HttpRequest.new(nginx_address + '/sub/' + channel.to_s + "_2").get :head => headers
           sub_2.stream do |chunk|
-            chunk.should eql("#{body}|#{channel.to_s + "_2"}\r\n")
+            chunk.should eql("#{body}|#{channel.to_s + "_2"}")
             messages += 1
           end
 
           sub_3 = EventMachine::HttpRequest.new(nginx_address + '/sub/' + channel.to_s + "_3").get :head => headers
           sub_3.stream do |chunk|
-            chunk.should eql("#{body}|#{channel.to_s + "_3"}\r\n")
+            chunk.should eql("#{body}|#{channel.to_s + "_3"}")
             messages += 1
           end
 
@@ -818,7 +818,7 @@ describe "Publisher Properties" do
         :header_template => " ", # send a space as header to has a chunk received
         :footer_template => nil,
         :ping_message_interval => nil,
-        :message_template => '{\"id\":\"~id~\", \"channel\":\"~channel~\", \"text\":\"~text~\"}'
+        :message_template => '{\"id\":\"~id~\", \"channel\":\"~channel~\", \"text\":\"~text~\"}|'
       })
 
       resp = ""
@@ -845,7 +845,7 @@ describe "Publisher Properties" do
             else
               if !stage1_complete
                 stage1_complete = true
-                response = JSON.parse(resp)
+                response = JSON.parse(resp.split("|")[0])
                 response["channel"].should eql(channel_1)
                 response["id"].to_i.should eql(-2)
                 response["text"].should eql("Channel deleted")
@@ -864,7 +864,7 @@ describe "Publisher Properties" do
                 end
               elsif !stage2_complete
                 stage2_complete = true
-                response = JSON.parse(resp.split("\r\n")[2])
+                response = JSON.parse(resp.split("|")[1])
                 response["channel"].should eql(channel_2)
                 response["id"].to_i.should eql(1)
                 response["text"].should eql(body)
@@ -875,7 +875,7 @@ describe "Publisher Properties" do
                   pub.response_header['X_NGINX_PUSHSTREAM_EXPLAIN'].should eql("Channel deleted.")
                 end
               else
-                response = JSON.parse(resp.split("\r\n")[3])
+                response = JSON.parse(resp.split("|")[2])
                 response["channel"].should eql(channel_2)
                 response["id"].to_i.should eql(-2)
                 response["text"].should eql("Channel deleted")
@@ -915,7 +915,7 @@ describe "Publisher Properties" do
             resp_1 += chunk
           end
           sub_1.callback do
-            resp_1.should eql("{\"id\":\"-2\", \"channel\":\"test_delete_channels_whith_subscribers_1\", \"text\":\"Channel deleted\"}\r\nFOOTER\r\n")
+            resp_1.should eql("{\"id\":\"-2\", \"channel\":\"test_delete_channels_whith_subscribers_1\", \"text\":\"Channel deleted\"}FOOTER")
           end
 
           resp_2 = ""
@@ -924,7 +924,7 @@ describe "Publisher Properties" do
             resp_2 += chunk
           end
           sub_2.callback do
-            resp_2.should eql("{\"id\":\"-2\", \"channel\":\"test_delete_channels_whith_subscribers_2\", \"text\":\"Channel deleted\"}\r\nFOOTER\r\n")
+            resp_2.should eql("{\"id\":\"-2\", \"channel\":\"test_delete_channels_whith_subscribers_2\", \"text\":\"Channel deleted\"}FOOTER")
           end
 
           stats = EventMachine::HttpRequest.new(nginx_address + '/channels-stats').get :head => {'accept' => 'application/json'}
@@ -979,7 +979,7 @@ describe "Publisher Properties" do
           sub_1.stream do |chunk|
 
             resp = resp + chunk
-            if resp == "#{conf.header_template}\r\n"
+            if resp == "#{conf.header_template}"
               pub = EventMachine::HttpRequest.new(nginx_address + '/pub?id=' + channel.to_s).delete :head => headers
               pub.callback do
                 pub.should be_http_status(200).without_body
@@ -988,7 +988,7 @@ describe "Publisher Properties" do
             end
           end
           sub_1.callback do
-            resp.should eql("#{conf.header_template}\r\nChannel deleted\r\n#{conf.footer_template}\r\n")
+            resp.should eql("#{conf.header_template}Channel deleted#{conf.footer_template}")
             EventMachine.stop
           end
         end
@@ -1041,8 +1041,8 @@ describe "Publisher Properties" do
           end
 
           EM.add_timer(2) do
-            resp.should eql("#{conf.header_template}\r\nChannel deleted\r\n#{conf.footer_template}\r\n")
-            resp2.should eql("<html><body>\r\n|Channel deleted|\r\n</body></html>\r\n")
+            resp.should eql("#{conf.header_template}Channel deleted#{conf.footer_template}")
+            resp2.should eql("<html><body>|Channel deleted|</body></html>")
             EventMachine.stop
           end
         end

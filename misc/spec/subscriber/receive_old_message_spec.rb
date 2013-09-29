@@ -5,7 +5,7 @@ describe "Receive old messages" do
     {
       :header_template => nil,
       :footer_template => nil,
-      :message_template => '{\"channel\":\"~channel~\", \"id\":\"~id~\", \"message\":\"~text~\"}',
+      :message_template => '{\"channel\":\"~channel~\", \"id\":\"~id~\", \"message\":\"~text~\"}|',
       :subscriber_mode => subscriber_mode
     }
   end
@@ -18,7 +18,7 @@ describe "Receive old messages" do
 
       body = 'body'
 
-      nginx_run_server(config.merge(:header_template => 'HEADER')) do |conf|
+      nginx_run_server(config.merge(:header_template => 'HEADER|')) do |conf|
         #create channels with some messages
         1.upto(3) do |i|
           publish_message(channel_1, headers, body + i.to_s)
@@ -32,7 +32,7 @@ describe "Receive old messages" do
             response_headers['ETAG'].to_s.should_not eql("")
           end
 
-          lines = response.split("\r\n")
+          lines = response.split("|")
           lines[0].should eql('HEADER')
           line = JSON.parse(lines[1])
           line['channel'].should eql(channel_2.to_s)
@@ -69,7 +69,7 @@ describe "Receive old messages" do
 
       body = 'body'
 
-      nginx_run_server(config.merge(:header_template => 'HEADER'), :timeout => 45) do |conf|
+      nginx_run_server(config.merge(:header_template => 'HEADER|'), :timeout => 45) do |conf|
         #create channels with some messages with progressive interval (1,2,3,5,7,9,12,15,18 seconds)
         1.upto(3) do |i|
           sleep(i)
@@ -91,7 +91,7 @@ describe "Receive old messages" do
             response_headers['ETAG'].to_s.should_not eql("")
           end
 
-          lines = response.split("\r\n")
+          lines = response.split("|")
           lines[0].should eql('HEADER')
 
           line = JSON.parse(lines[1])
@@ -124,7 +124,7 @@ describe "Receive old messages" do
 
       body = 'body'
 
-      nginx_run_server(config.merge(:header_template => 'HEADER'), :timeout => 45) do |conf|
+      nginx_run_server(config.merge(:header_template => 'HEADER|'), :timeout => 45) do |conf|
         #create channels with some messages with progressive interval (1,2,3,5,7,9,12,15,18 seconds)
         1.upto(3) do |i|
           sleep(i)
@@ -146,7 +146,7 @@ describe "Receive old messages" do
             response_headers['ETAG'].to_s.should_not eql("")
           end
 
-          lines = response.split("\r\n")
+          lines = response.split("|")
           lines[0].should eql('HEADER')
 
           line = JSON.parse(lines[1])
@@ -185,7 +185,7 @@ describe "Receive old messages" do
     it "should receive old messages by 'last_event_id'" do
       channel = 'ch_test_disconnect_after_receive_old_messages_by_last_event_id_when_longpolling_is_on'
 
-      nginx_run_server(config.merge(:message_template => '~text~')) do |conf|
+      nginx_run_server(config.merge(:message_template => '|~text~|')) do |conf|
         publish_message(channel, {'Event-Id' => 'event 1'}, 'msg 1')
         publish_message(channel, {'Event-Id' => 'event 2'}, 'msg 2')
         publish_message(channel, {}, 'msg 3')
@@ -198,7 +198,7 @@ describe "Receive old messages" do
             response_headers['ETAG'].to_s.should_not eql("")
           end
 
-          response.should eql("msg 3\r\nmsg 4\r\n")
+          response.should eql("msg 3|msg 4|")
         end
       end
     end
@@ -209,7 +209,7 @@ describe "Receive old messages" do
       messages_to_publish = 10
       now = nil
 
-      nginx_run_server(config.merge(:message_template => '~text~')) do |conf|
+      nginx_run_server(config.merge(:message_template => '~text~|')) do |conf|
         messages_to_publish.times do |i|
           now = Time.now if i == 5
           publish_message(channel.to_s, headers, body_prefix + i.to_s)
@@ -222,7 +222,7 @@ describe "Receive old messages" do
             response_headers['ETAG'].to_s.should eql("10")
           end
 
-          response.should eql("msg 6\r\nmsg 7\r\nmsg 8\r\nmsg 9\r\n")
+          response.should eql("msg 6|msg 7|msg 8|msg 9|")
         end
       end
     end
@@ -231,7 +231,7 @@ describe "Receive old messages" do
       channel = 'ch_test_receiving_messages_untie_by_etag'
       body = 'msg 1'
 
-      nginx_run_server(config.merge(:message_template => '~text~')) do |conf|
+      nginx_run_server(config.merge(:message_template => '~text~|')) do |conf|
         now = Time.now
         publish_message(channel.to_s, headers, body)
 
@@ -242,7 +242,7 @@ describe "Receive old messages" do
             response_headers['ETAG'].to_s.should eql("1")
           end
 
-          response.should eql("msg 1\r\n")
+          response.should eql("msg 1|")
         end
       end
     end
@@ -253,7 +253,7 @@ describe "Receive old messages" do
       messages_to_publish = 10
       now = nil
 
-      nginx_run_server(config.merge(:last_received_message_time => "$arg_time", :last_received_message_tag => "$arg_tag", :message_template => '~text~')) do |conf|
+      nginx_run_server(config.merge(:last_received_message_time => "$arg_time", :last_received_message_tag => "$arg_tag", :message_template => '~text~|')) do |conf|
         messages_to_publish.times do |i|
           now = Time.now if i == 5
           publish_message(channel.to_s, headers, body_prefix + i.to_s)
@@ -266,7 +266,7 @@ describe "Receive old messages" do
             response_headers['ETAG'].to_s.should eql("10")
           end
 
-          response.should eql("msg 6\r\nmsg 7\r\nmsg 8\r\nmsg 9\r\n")
+          response.should eql("msg 6|msg 7|msg 8|msg 9|")
         end
       end
     end
@@ -277,7 +277,7 @@ describe "Receive old messages" do
       messages_to_publish = 10
       now = nil
 
-      nginx_run_server(config.merge(:last_event_id => "$arg_event_id", :message_template => '~text~')) do |conf|
+      nginx_run_server(config.merge(:last_event_id => "$arg_event_id", :message_template => '|~text~|')) do |conf|
         publish_message(channel, {'Event-Id' => 'event 1'}, 'msg 1')
         publish_message(channel, {'Event-Id' => 'event 2'}, 'msg 2')
         publish_message(channel, {}, 'msg 3')
@@ -290,7 +290,7 @@ describe "Receive old messages" do
             response_headers['ETAG'].to_s.should_not eql("")
           end
 
-          response.should eql("msg 3\r\nmsg 4\r\n")
+          response.should eql("msg 3|msg 4|")
         end
       end
     end
@@ -302,11 +302,11 @@ describe "Receive old messages" do
       sub_1 = EventMachine::HttpRequest.new(url).get :head => request_headers
       sub_1.stream do |chunk|
         response += chunk
-        lines = response.split("\r\n").map {|line| line.gsub(/^: /, "").gsub(/^data: /, "").gsub(/^id: .*/, "") }.delete_if{|line| line.empty?}.compact
+        lines = response.split(/\r\n|\|/).compact.map {|line| line.gsub(/^: /, "").gsub(/^data: /, "").gsub(/^id: .*/, "") }.delete_if{|line| line.empty?}.compact
 
         if lines.length >= number_expected_lines
           EventMachine.stop
-          block.call("#{lines.join("\r\n")}\r\n", sub_1.response_header) unless block.nil?
+          block.call("#{lines.join("|")}|", sub_1.response_header) unless block.nil?
         end
       end
     end
@@ -355,12 +355,12 @@ describe "Receive old messages" do
         hash_headers
       end
 
-      lines = body.gsub(/[^\w{:,}" ]/, "\n").gsub("d{", "{").split("\n").delete_if{|line| line.empty?}.compact
+      lines = body.gsub(/[^\w{:,}" ]/, "\n").gsub("e{", "{").split("\n").delete_if{|line| line.empty?}.compact
 
       lines.length.should be >= number_expected_lines
 
       if lines.length >= number_expected_lines
-        block.call("#{lines.join("\r\n")}\r\n", resp_headers) unless block.nil?
+        block.call("#{lines.join("|")}|", resp_headers) unless block.nil?
       end
     end
 

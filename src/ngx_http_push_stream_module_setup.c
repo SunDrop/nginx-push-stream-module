@@ -373,18 +373,20 @@ ngx_http_push_stream_postconfig(ngx_conf_t *cf)
         return NGX_ERROR;
     }
 
-    u_char aux[ngx_http_push_stream_padding_max_len + 1];
-    ngx_memset(aux, ' ', ngx_http_push_stream_padding_max_len);
-    aux[ngx_http_push_stream_padding_max_len] = '\0';
+    ngx_str_t *aux = ngx_http_push_stream_create_str(cf->pool, ngx_http_push_stream_padding_max_len);
+    ngx_memset(aux->data, ' ', ngx_http_push_stream_padding_max_len);
 
     ngx_int_t i, len = ngx_http_push_stream_padding_max_len;
     for (i = steps; i >= 0; i--) {
-        if ((*(ngx_http_push_stream_module_paddings_chunks + i) = ngx_http_push_stream_get_formatted_chunk(aux, len, cf->pool)) == NULL) {
+        ngx_str_t *padding = ngx_pcalloc(cf->pool, sizeof(ngx_str_t));
+        if ((*(ngx_http_push_stream_module_paddings_chunks + i) = padding) == NULL) {
             ngx_conf_log_error(NGX_LOG_ERR, cf, 0, "push stream module: unable to allocate memory to create padding messages");
             return NGX_ERROR;
         }
+        padding->data = aux->data;
+        padding->len = len;
+
         len = i * 100;
-        *(aux + len) = '\0';
     }
 
     return ngx_http_push_stream_set_up_shm(cf, ngx_http_push_stream_shm_size);
@@ -635,14 +637,8 @@ ngx_http_push_stream_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
         }
     } else {
         // formatting header and footer template for chunk transfer
-        if (conf->header_template.len > 0) {
-            ngx_str_t *aux = NULL;
-            if (conf->location_type == NGX_HTTP_PUSH_STREAM_SUBSCRIBER_MODE_WEBSOCKET) {
-                aux = ngx_http_push_stream_get_formatted_websocket_frame(&NGX_HTTP_PUSH_STREAM_WEBSOCKET_TEXT_LAST_FRAME_BYTE, sizeof(NGX_HTTP_PUSH_STREAM_WEBSOCKET_TEXT_LAST_FRAME_BYTE), conf->header_template.data, conf->header_template.len, cf->pool);
-            } else {
-                aux = ngx_http_push_stream_get_formatted_chunk(conf->header_template.data, conf->header_template.len, cf->pool);
-            }
-
+        if ((conf->header_template.len > 0) && (conf->location_type == NGX_HTTP_PUSH_STREAM_SUBSCRIBER_MODE_WEBSOCKET)) {
+            ngx_str_t *aux = ngx_http_push_stream_get_formatted_websocket_frame(&NGX_HTTP_PUSH_STREAM_WEBSOCKET_TEXT_LAST_FRAME_BYTE, sizeof(NGX_HTTP_PUSH_STREAM_WEBSOCKET_TEXT_LAST_FRAME_BYTE), conf->header_template.data, conf->header_template.len, cf->pool);
             if (aux == NULL) {
                 ngx_conf_log_error(NGX_LOG_ERR, cf, 0, "push stream module: unable to allocate memory to format header template");
                 return NGX_CONF_ERROR;
@@ -651,14 +647,8 @@ ngx_http_push_stream_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
             conf->header_template.len = aux->len;
         }
 
-        if (conf->footer_template.len > 0) {
-            ngx_str_t *aux = NULL;
-            if (conf->location_type == NGX_HTTP_PUSH_STREAM_SUBSCRIBER_MODE_WEBSOCKET) {
-                aux = ngx_http_push_stream_get_formatted_websocket_frame(&NGX_HTTP_PUSH_STREAM_WEBSOCKET_TEXT_LAST_FRAME_BYTE, sizeof(NGX_HTTP_PUSH_STREAM_WEBSOCKET_TEXT_LAST_FRAME_BYTE), conf->footer_template.data, conf->footer_template.len, cf->pool);
-            } else {
-                aux = ngx_http_push_stream_get_formatted_chunk(conf->footer_template.data, conf->footer_template.len, cf->pool);
-            }
-
+        if ((conf->footer_template.len > 0) && (conf->location_type == NGX_HTTP_PUSH_STREAM_SUBSCRIBER_MODE_WEBSOCKET)) {
+            ngx_str_t *aux = ngx_http_push_stream_get_formatted_websocket_frame(&NGX_HTTP_PUSH_STREAM_WEBSOCKET_TEXT_LAST_FRAME_BYTE, sizeof(NGX_HTTP_PUSH_STREAM_WEBSOCKET_TEXT_LAST_FRAME_BYTE), conf->footer_template.data, conf->footer_template.len, cf->pool);
             if (aux == NULL) {
                 ngx_conf_log_error(NGX_LOG_ERR, cf, 0, "push stream module: unable to allocate memory to format footer template");
                 return NGX_CONF_ERROR;
@@ -905,7 +895,7 @@ ngx_http_push_stream_init_shm_zone(ngx_shm_zone_t *shm_zone, void *data)
     }
 
     // create longpooling timeout message
-    if ((ngx_http_push_stream_longpooling_timeout_msg = ngx_http_push_stream_convert_char_to_msg_on_shared_locked((u_char *)NGX_HTTP_PUSH_STREAM_LONGPOOLING_TIMEOUT_MESSAGE_TEXT, sizeof(NGX_HTTP_PUSH_STREAM_LONGPOOLING_TIMEOUT_MESSAGE_TEXT), NULL, NGX_HTTP_PUSH_STREAM_LONGPOOLING_TIMEOUT_MESSAGE_ID, NULL, NULL, ngx_cycle->pool)) == NULL) {
+    if ((ngx_http_push_stream_longpooling_timeout_msg = ngx_http_push_stream_convert_char_to_msg_on_shared_locked((u_char *)NGX_HTTP_PUSH_STREAM_LONGPOOLING_TIMEOUT_MESSAGE_TEXT, ngx_strlen(NGX_HTTP_PUSH_STREAM_LONGPOOLING_TIMEOUT_MESSAGE_TEXT), NULL, NGX_HTTP_PUSH_STREAM_LONGPOOLING_TIMEOUT_MESSAGE_ID, NULL, NULL, ngx_cycle->pool)) == NULL) {
         return NGX_ERROR;
     }
 
